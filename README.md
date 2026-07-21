@@ -120,5 +120,37 @@ registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
 - [Tauri 插件](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
 - [rust-analyzer 插件](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 
+### 4. 自动发布
+
+项目通过 GitHub Actions（[`.github/workflows/release.yml`](.github/workflows/release.yml)）实现自动发布。
+
+#### 4.1 触发条件
+
+推送到 `main` 分支且 **commit message 包含 `[release]` 字符串**时触发构建与发布。普通提交不会触发（workflow 启动后立即跳过，几乎不消耗资源）。
+
+#### 4.2 发布流程
+
+（1）同步更新 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 三处的 `version` 字段
+
+（2）提交时在 message 中加入 `[release]`：
+
+```bash
+git commit -m "release: 发布 v0.1.0 [release]"
+git push
+```
+
+（3）CNB 会自动将 `main` 分支同步到 GitHub，触发 Actions 自动构建并发布 Release
+
+#### 4.3 发布产物
+
+自动构建并上传到 GitHub Release 的产物（以 `v0.1.0` 为例）：
+
+| 产物 | 说明 |
+| --- | --- |
+| `toolkit-manager-v0.1.0-windows.msi` | Windows 安装版，带安装向导 |
+| `toolkit-manager-v0.1.0-windows-portable.zip` | Windows 便携版，解压即用，需系统已安装 WebView2 Runtime |
+
+Release 会自动创建对应的 `v0.1.0` 标签并设为 latest。
+
 ---
 *本文档由 markdowncli 技能辅助生成*
