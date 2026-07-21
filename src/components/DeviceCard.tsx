@@ -136,6 +136,7 @@ export function DeviceCard({
             size="icon"
             aria-label="详情"
             onClick={handleActionClick}
+            className="hover:bg-orange-500 hover:text-white"
           >
             <Info className="h-4 w-4" />
           </Button>
@@ -144,6 +145,7 @@ export function DeviceCard({
             size="icon"
             aria-label="编辑"
             onClick={handleActionClick}
+            className="hover:bg-orange-500 hover:text-white"
           >
             <Edit className="h-4 w-4" />
           </Button>
@@ -152,6 +154,7 @@ export function DeviceCard({
             size="icon"
             aria-label="删除"
             onClick={handleActionClick}
+            className="hover:bg-orange-500 hover:text-white"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
