@@ -1,0 +1,151 @@
+name: Release
+
+# 触发条件：推送到 main 分支时启动
+# job 内部通过 commit message 是否含 [release] 来判断是否真正执行发布
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+# 同一分支连续推送时取消旧构建，避免重复劳动
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Windows artifacts
+    runs-on: windows-latest
+    # 仅当本次提交的 commit message 含 [release] 时才执行
+    if: contains(github.event.head_commit.message, '[release]')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Read version from package.json
+        id: version
+        shell: bash
+        run: |
+          # 从 package.json 读取 version 字段
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.12.3
+          run_install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Tauri App (MSI only)
+        shell: pwsh
+        run: pnpm tauri build --bundles msi
+
+      - name: Prepare release assets
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          $VERSION = "v$env:APP_VERSION"
+
+          # ---- 1. MSI 安装包 ----
+          $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $msi) {
+            throw 'No MSI installer found under src-tauri/target/release/bundle/msi'
+          }
+          $msiDest = "toolkit-manager-$VERSION-windows.msi"
+          Copy-Item $msi.FullName "release-assets/$msiDest"
+          Write-Host "MSI copied: $msiDest"
+
+          # ---- 2. Portable 便携版（裸 exe + 标记文件） ----
+          $exePath = 'src-tauri/target/release/toolkit-manager.exe'
+          if (-not (Test-Path $exePath)) {
+            throw "Portable exe not found at $exePath"
+          }
+          $portableDir = 'release-assets/toolkit-manager-portable'
+          New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
+          Copy-Item $exePath $portableDir
+          # 写入便携版标记文件，便于运行时识别（参考 cc-switch 思路）
+          @(
+            '# toolkit-manager portable build marker',
+            'portable=true'
+          ) | Set-Content -Path (Join-Path $portableDir 'portable.ini') -Encoding UTF8
+
+          $portableZip = "release-assets/toolkit-manager-$VERSION-windows-portable.zip"
+          Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
+          Remove-Item -Recurse -Force $portableDir
+          Write-Host "Portable zip created: toolkit-manager-$VERSION-windows-portable.zip"
+
+          # ---- 3. 列出最终产物 ----
+          Write-Host '=== Final assets ==='
+          Get-ChildItem release-assets | Format-Table Name, Length
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
+      # checkout 仅为读取 package.json 中的版本号
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Read version from package.json
+        id: ver
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-release-assets
+          path: release-assets
+
+      - name: List downloaded assets
+        shell: bash
+        run: ls -la release-assets
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: toolkit-manager ${{ steps.ver.outputs.tag }}
+          body: |
+            ## toolkit-manager ${{ steps.ver.outputs.tag }}
+
+            ### 下载
+
+            - **Windows 安装版**: `toolkit-manager-${{ steps.ver.outputs.tag }}-windows.msi`（推荐，带安装向导）
+            - **Windows 便携版**: `toolkit-manager-${{ steps.ver.outputs.tag }}-windows-portable.zip`（解压即用，需系统已安装 WebView2 Runtime）
+
+            > 便携版为裸可执行文件，运行需系统已安装 WebView2 Runtime（Win10/11 通常自带）。
+          files: release-assets/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
