@@ -64,7 +64,7 @@ export function ContentArea({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="h-full p-6"
+          className="min-h-full p-6 pb-10"
         >
           {renderPage(activeTab)}
         </motion.div>
