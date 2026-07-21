@@ -7,7 +7,12 @@
     "core:default",
     "opener:default",
     "dialog:default",
-    "fs:default",
-    "store:default"
+    "store:default",
+    "fs:allow-read-dir",
+    "fs:allow-read-text-file",
+    {
+      "identifier": "fs:scope",
+      "allow": ["**"]
+    }
   ]
 }

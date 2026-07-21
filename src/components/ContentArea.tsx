@@ -20,18 +20,24 @@ import { AboutPage } from "@/pages/AboutPage";
 export interface ContentAreaProps {
   /** 当前激活的标签 */
   activeTab: TabId;
+  /** 切换标签回调（透传给需要跳转的页面，如设备页引导态） */
+  onSwitch: (tab: TabId) => void;
 }
 
 /**
  * 根据 activeTab 返回对应页面元素
  *
  * @param activeTab - 当前标签
+ * @param onSwitch - 切换标签回调（仅 devices 页需要跳转能力）
  * @returns 对应的页面 React 元素
  */
-function renderPage(activeTab: TabId): React.ReactElement {
+function renderPage(
+  activeTab: TabId,
+  onSwitch: (tab: TabId) => void,
+): React.ReactElement {
   switch (activeTab) {
     case "devices":
-      return <DevicesPage />;
+      return <DevicesPage onNavigateSettings={() => onSwitch("settings")} />;
     case "projects":
       return <ProjectsPage />;
     case "settings":
@@ -41,7 +47,7 @@ function renderPage(activeTab: TabId): React.ReactElement {
     default: {
       // 理论上不可达：TabId 类型已限定为上述四个值
       // 返回设备页作为兜底，保证运行时健壮性
-      return <DevicesPage />;
+      return <DevicesPage onNavigateSettings={() => onSwitch("settings")} />;
     }
   }
 }
@@ -54,6 +60,7 @@ function renderPage(activeTab: TabId): React.ReactElement {
  */
 export function ContentArea({
   activeTab,
+  onSwitch,
 }: ContentAreaProps): React.ReactElement {
   return (
     <main className="ml-14 mt-16 h-[calc(100vh-4rem)] overflow-auto">
@@ -66,7 +73,7 @@ export function ContentArea({
           transition={{ duration: 0.2 }}
           className="min-h-full p-6 pb-10"
         >
-          {renderPage(activeTab)}
+          {renderPage(activeTab, onSwitch)}
         </motion.div>
       </AnimatePresence>
     </main>

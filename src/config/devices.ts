@@ -1,116 +1,84 @@
 /**
  * =====================================================
  * Copyright © sumu. 2026-present. All rights reserved.
- * File name  : devices.ts
+ * File name  : devices.ts (config)
  * Author     : sumu
- * Date       : 2026/07/21
- * Description: 设备固定数据与类型→图标/状态→样式映射
+ * Date       : 2026/07/22
+ * Description: 设备相关常量与通道摘要格式化纯函数
  * ======================================================
  */
 
-import {
-  Laptop,
-  Monitor,
-  Server,
-  Smartphone,
-  type LucideIcon,
-} from "lucide-react";
-
-import type { Device, DeviceStatus, DeviceType } from "@/types/device";
-
-/** 设备类型到图标的映射（新增类型只需在此扩展） */
-export const DEVICE_TYPE_ICON: Record<DeviceType, LucideIcon> = {
-  laptop: Laptop,
-  desktop: Monitor,
-  server: Server,
-  mobile: Smartphone,
-};
-
-/** 设备状态徽章的视觉样式 */
-export interface DeviceStatusStyle {
-  label: string;     // 中文文案（本章节硬编码，后续替换为 i18n key）
-  dotClass: string;  // 状态圆点背景色 class
-  bgClass: string;   // 徽章背景色 class
-  textClass: string; // 文字色 class
-}
-
-/** 设备状态到徽章视觉样式的映射（绿/黄/红 三色方案，含 dark 变体） */
-export const DEVICE_STATUS_STYLE: Record<DeviceStatus, DeviceStatusStyle> = {
-  online: {
-    label: "在线",
-    dotClass: "bg-green-500",
-    bgClass: "bg-green-500/10",
-    textClass: "text-green-600 dark:text-green-400",
-  },
-  degraded: {
-    label: "降级",
-    dotClass: "bg-yellow-500",
-    bgClass: "bg-yellow-500/10",
-    textClass: "text-yellow-600 dark:text-yellow-400",
-  },
-  offline: {
-    label: "离线",
-    dotClass: "bg-red-500",
-    bgClass: "bg-red-500/10",
-    textClass: "text-red-600 dark:text-red-400",
-  },
-};
+import type { AdbChannel, SerialChannel, SshChannel } from "@/types/device";
 
 /**
- * 固定设备列表（占位数据）
+ * 设备配置的预置项 name
  *
- * 覆盖 4 种设备类型与 3 种在线状态，字段对齐未来 Tauri 系统接口返回结构。
- * 本章节完全静态，运行时不可变。
+ * 与 settings 的 PRESET_DIRECTORY_ITEMS 中 embedded-mcp-toolkit 对应，
+ * 数据层据此从目录配置中取该预置项的路径。
  */
-export const MOCK_DEVICES: readonly Device[] = [
-  {
-    id: "dev-001",
-    name: "MacBook Pro",
-    type: "laptop",
-    status: "online",
-    ip: "192.168.1.10",
-    mac: "AA:BB:CC:00:00:01",
-    os: "macOS 14.5",
-    configSummary: "M3 Pro · 18GB",
-  },
-  {
-    id: "dev-002",
-    name: "Windows 工作站",
-    type: "desktop",
-    status: "online",
-    ip: "192.168.1.11",
-    mac: "AA:BB:CC:00:00:02",
-    os: "Windows 11",
-    configSummary: "i7-13700K · 32GB",
-  },
-  {
-    id: "dev-003",
-    name: "Ubuntu 构建服务器",
-    type: "server",
-    status: "degraded",
-    ip: "192.168.1.20",
-    mac: "AA:BB:CC:00:00:03",
-    os: "Ubuntu 22.04",
-    configSummary: "Ryzen 9 · 64GB",
-  },
-  {
-    id: "dev-004",
-    name: "测试服务器",
-    type: "server",
-    status: "offline",
-    ip: "192.168.1.21",
-    mac: "AA:BB:CC:00:00:04",
-    os: "CentOS 7",
-    configSummary: "Xeon E5 · 32GB",
-  },
-  {
-    id: "dev-005",
-    name: "iPhone 15",
-    type: "mobile",
-    status: "offline",
-    ip: "192.168.1.30",
-    mac: "AA:BB:CC:00:00:05",
-    os: "iOS 17.5",
-    configSummary: "A16 · 6GB",
-  },
-];
+export const PRESET_DEVICE_DIR_NAME = "embedded-mcp-toolkit" as const;
+
+/**
+ * 设备 yaml 所在子目录（相对 embedded-mcp-toolkit 根路径）
+ *
+ * 用正斜杠，跨平台路径拼接时由调用方处理分隔符。
+ */
+export const DEVICES_SUBDIR = ".embedded/configs/devices" as const;
+
+/**
+ * 脱敏占位符
+ *
+ * 列表场景下 password 等敏感字段统一显示为该字符，不暴露明文。
+ */
+export const MASKED_VALUE = "·" as const;
+
+/**
+ * 格式化 SSH 通道连接摘要
+ *
+ * 已启用返回 `user@host:port`（缺失字段按默认补齐），
+ * 未启用（host 为 none 或缺失）返回空字符串，由调用方决定如何展示。
+ *
+ * @param ssh - SSH 通道，可为 undefined
+ * @returns 连接摘要字符串；未启用返回空字符串
+ */
+export function formatSshSummary(ssh: SshChannel | undefined): string {
+  if (!ssh || ssh.host === "none") {
+    return "";
+  }
+  const host = ssh.host ?? "";
+  const port = ssh.port ?? 22;
+  const user = ssh.username ?? "";
+  return `${user}@${host}:${port}`;
+}
+
+/**
+ * 格式化 Serial 通道连接摘要
+ *
+ * 已启用返回 `port@baudRate`，未启用（port 为 none 或缺失）返回空字符串。
+ *
+ * @param serial - Serial 通道，可为 undefined
+ * @returns 连接摘要字符串；未启用返回空字符串
+ */
+export function formatSerialSummary(serial: SerialChannel | undefined): string {
+  if (!serial || serial.port === "none") {
+    return "";
+  }
+  const port = serial.port ?? "";
+  const baudRate = serial.baudRate ?? 115200;
+  return `${port}@${baudRate}`;
+}
+
+/**
+ * 格式化 ADB 通道摘要
+ *
+ * 已绑定具体设备返回序列号，未绑定（sn_none 或空）返回空字符串。
+ *
+ * @param adb - ADB 通道，可为 undefined
+ * @returns 序列号字符串；未绑定返回空字符串
+ */
+export function formatAdbSummary(adb: AdbChannel | undefined): string {
+  if (!adb || !adb.serialNo || adb.serialNo === "sn_none") {
+    return "";
+  }
+  return adb.serialNo;
+}

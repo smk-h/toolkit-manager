@@ -3,57 +3,175 @@
  * Copyright © sumu. 2026-present. All rights reserved.
  * File name  : DevicesPage.tsx
  * Author     : sumu
- * Date       : 2026/07/21
- * Description: 设备管理页（卡片列表）
+ * Date       : 2026/07/22
+ * Description: 设备管理页（读取 yaml 设备配置 + 引导态 + 详情/复制）
  * ======================================================
  */
 
 import { useState } from "react";
 
+import { Settings } from "lucide-react";
+
 import { DeviceCard } from "@/components/DeviceCard";
-import { MOCK_DEVICES } from "@/config/devices";
+import { DeviceDetailDialog } from "@/components/DeviceDetailDialog";
+import { Button } from "@/components/ui/button";
+import { useDevices } from "@/hooks/useDevices";
+import { useToast } from "@/hooks/useToast";
+import { copyText } from "@/lib/clipboard";
+import type { Device } from "@/types/device";
+
+/** DevicesPage 组件属性 */
+export interface DevicesPageProps {
+  /** 跳转到设置页（引导态按钮触发） */
+  onNavigateSettings: () => void;
+}
 
 /**
  * 设备管理页
  *
- * 渲染标题区与设备卡片列表，持有单选选中状态。
- * 本章节设备数据来自 MOCK_DEVICES（完全静态），
- * 后续章节替换为 Tauri 系统接口返回值时只需改数据源。
+ * 按 useDevices 的 status 分流渲染：
+ * - loading：加载提示
+ * - no-path / dir-missing：引导态（提示 + 跳转设置按钮）
+ * - error：错误提示
+ * - ready：设备卡片列表（含详情对话框、复制、占位编辑/删除）
  *
+ * @param props - 组件属性
  * @returns 渲染后的页面元素
  */
-export function DevicesPage(): React.ReactElement {
-  // 选中状态：仅 React state，不持久化；初始为 null（无选中）
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export function DevicesPage({
+  onNavigateSettings,
+}: DevicesPageProps): React.ReactElement {
+  const { status } = useDevices();
+  const { show } = useToast();
+  // 详情对话框当前查看的设备
+  const [detailDevice, setDetailDevice] = useState<Device | null>(null);
+
+  /**
+   * 复制设备原始 yaml 全文到剪贴板
+   *
+   * @param device - 目标设备
+   */
+  const handleCopy = async (device: Device): Promise<void> => {
+    const ok = await copyText(device.rawYaml);
+    if (ok) {
+      show("已复制 yaml 到剪贴板", "success");
+    } else {
+      show("复制失败", "error");
+    }
+  };
+
+  /** 编辑（占位） */
+  const handleEdit = (): void => {
+    show("编辑功能开发中", "info");
+  };
+
+  /** 删除（占位） */
+  const handleDelete = (): void => {
+    show("删除功能开发中", "info");
+  };
 
   return (
     <div className="space-y-6">
-      {/* 标题区 */}
-      <div>
-        <h2 className="text-xl font-semibold">设备管理</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          共 {MOCK_DEVICES.length} 台设备
-        </p>
-      </div>
-
-      {/* 卡片列表 */}
-      <div className="space-y-3">
-        {MOCK_DEVICES.map((device) => (
-          <DeviceCard
-            key={device.id}
-            device={device}
-            isSelected={device.id === selectedId}
-            onSelect={(d): void => setSelectedId(d.id)}
-          />
-        ))}
-      </div>
-
-      {/* 空状态兜底（防御性，本章节 MOCK_DEVICES 非空不会触发） */}
-      {MOCK_DEVICES.length === 0 && (
-        <div className="px-6 py-8 text-center border border-dashed rounded-lg border-border text-muted-foreground">
-          暂无设备
+      {/* 标题区：仅 ready 态显示总数，其余态由各自提示区说明 */}
+      {status.kind === "ready" && (
+        <div>
+          <h2 className="text-xl font-semibold">设备管理</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            共 {status.devices.length} 台设备
+          </p>
         </div>
       )}
+
+      {/* 加载态 */}
+      {status.kind === "loading" && (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          加载中...
+        </div>
+      )}
+
+      {/* 引导态：未配置路径 */}
+      {status.kind === "no-path" && (
+        <GuideCard
+          message="尚未配置 embedded-mcp-toolkit 目录路径，请先在设置中完成配置。"
+          onNavigateSettings={onNavigateSettings}
+        />
+      )}
+
+      {/* 引导态：路径已填但目录不存在 */}
+      {status.kind === "dir-missing" && (
+        <GuideCard
+          message="配置的 embedded-mcp-toolkit 路径下未找到 .embedded/configs/devices 目录，请检查路径是否正确。"
+          onNavigateSettings={onNavigateSettings}
+        />
+      )}
+
+      {/* 错误态 */}
+      {status.kind === "error" && (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          设备配置读取失败，请稍后重试。
+        </div>
+      )}
+
+      {/* 就绪：设备列表 */}
+      {status.kind === "ready" && (
+        <>
+          {status.devices.length > 0 ? (
+            <div className="space-y-3">
+              {status.devices.map((device) => (
+                <DeviceCard
+                  key={device.name}
+                  device={device}
+                  onDetail={setDetailDevice}
+                  onCopy={handleCopy}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="border border-dashed rounded-lg border-border px-6 py-8 text-center text-sm text-muted-foreground">
+              目录下暂无设备配置文件
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 详情对话框 */}
+      <DeviceDetailDialog
+        device={detailDevice}
+        onClose={() => setDetailDevice(null)}
+      />
+    </div>
+  );
+}
+
+/** GuideCard 组件属性 */
+interface GuideCardProps {
+  /** 提示文案 */
+  message: string;
+  /** 跳转设置页回调 */
+  onNavigateSettings: () => void;
+}
+
+/**
+ * 引导态卡片
+ *
+ * 未配置或路径无效时展示提示文案与跳转按钮。
+ *
+ * @param props - 组件属性
+ * @returns 渲染后的卡片元素
+ */
+function GuideCard({
+  message,
+  onNavigateSettings,
+}: GuideCardProps): React.ReactElement {
+  return (
+    <div className="rounded-xl border bg-card p-8 text-center text-card-foreground">
+      <Settings className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">{message}</p>
+      <Button onClick={onNavigateSettings} className="mt-4">
+        去设置
+      </Button>
     </div>
   );
 }

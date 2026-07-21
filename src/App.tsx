@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { ContentArea } from "@/components/ContentArea";
 import { Header } from "@/components/Header";
 import { SideNav } from "@/components/SideNav";
+import { ToastContainer } from "@/components/ui/toast";
 import { useActiveTab } from "@/hooks/useActiveTab";
 
 /**
@@ -67,7 +68,8 @@ function App(): React.ReactElement {
     <div className="h-screen overflow-hidden bg-background text-foreground">
       <Header />
       <SideNav activeTab={activeTab} onSwitch={setActiveTab} />
-      <ContentArea activeTab={activeTab} />
+      <ContentArea activeTab={activeTab} onSwitch={setActiveTab} />
+      <ToastContainer />
     </div>
   );
 }
