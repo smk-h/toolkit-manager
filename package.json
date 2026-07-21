@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "sync-version": "node scripts/sync-version.mjs"
+    "sync-version": "node scripts/sync-version.mjs",
+    "kill-dev": "node scripts/kill-dev.mjs"
   },
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.13",
