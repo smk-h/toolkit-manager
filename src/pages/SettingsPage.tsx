@@ -34,7 +34,7 @@ import { useDirectoryConfig } from "@/hooks/useDirectoryConfig";
  * @returns 渲染后的页面元素
  */
 export function SettingsPage(): React.ReactElement {
-  const { items, isLoading, addItem, removeItem, updatePath } =
+  const { items, isLoading, addItem, removeItem, updatePath, updateName } =
     useDirectoryConfig();
 
   /**
@@ -110,8 +110,14 @@ export function SettingsPage(): React.ReactElement {
               <DirectoryItemRow
                 key={item.id}
                 item={item}
-                // 仅新增项（最后一项且路径为空）自动聚焦，避免重渲染抢焦
-                autoFocus={index === items.length - 1 && item.path === ""}
+                // 仅新增的用户自定义项（最后一项、非预置、路径为空）自动聚焦，
+                // 避免空路径的预置项在每次加载时抢焦
+                autoFocus={
+                  index === items.length - 1 &&
+                  !item.isPreset &&
+                  item.path === ""
+                }
+                onNameChange={updateName}
                 onPathChange={updatePath}
                 onRemove={removeItem}
                 onPickDirectory={handlePickDirectory}
