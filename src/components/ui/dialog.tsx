@@ -9,6 +9,7 @@
  */
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 import { X } from "lucide-react";
 
@@ -31,11 +32,15 @@ export interface DialogProps {
 /**
  * Modal 对话框
  *
- * 居中浮于内容上方的面板，无遮罩层、无第三方弹窗依赖。
- * 交互：ESC 关闭、右上角 X 关闭。
+ * 居中浮于内容上方的面板，含半透明遮罩层、无第三方弹窗依赖。
+ * 交互：ESC 关闭、点击遮罩关闭、右上角 X 关闭。
+ *
+ * 通过 createPortal 渲染到 document.body，脱离组件树中可能存在的
+ * 层叠上下文（如 framer-motion 的 opacity/will-change、overflow 容器），
+ * 保证遮罩铺满视口、层级覆盖整页。
  *
  * @param props - 组件属性
- * @returns open 为 true 时返回居中面板，否则返回 null
+ * @returns open 为 true 时返回 Portal，否则返回 null
  */
 export function Dialog({
   open,
@@ -60,15 +65,36 @@ export function Dialog({
     };
   }, [open, onClose]);
 
+  // 打开时锁定 body 滚动，避免背景内容穿透滚动
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, [open]);
+
   if (!open) {
     return null;
   }
 
-  return (
+  // 通过 Portal 渲染到 body，脱离组件树中可能的层叠上下文
+  // （如 framer-motion 的 opacity/will-change、overflow 容器），
+  // 确保 fixed 定位相对视口、z-index 能覆盖整页。
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="presentation"
     >
+      {/* 半透明遮罩：阻挡下方页面内容透出，点击关闭 */}
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+        aria-hidden="true"
+      />
       <div
         role="dialog"
         aria-modal="true"
@@ -96,6 +122,7 @@ export function Dialog({
         {/* 内容区 */}
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
