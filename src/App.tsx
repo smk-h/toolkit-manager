@@ -1,50 +1,74 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+/**
+ * =====================================================
+ * Copyright © sumu. 2026-present. All rights reserved.
+ * File name  : App.tsx
+ * Author     : sumu
+ * Date       : 2026/07/21
+ * Description: 应用根组件（三栏布局 + 路由状态）
+ * ======================================================
+ */
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+import { useEffect } from "react";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+import { ContentArea } from "@/components/ContentArea";
+import { Header } from "@/components/Header";
+import { SideNav } from "@/components/SideNav";
+import { useActiveTab } from "@/hooks/useActiveTab";
+
+/**
+ * 判断当前目标是否为可编辑元素
+ *
+ * 用于键盘快捷键处理，避免在 input/textarea 中误触发。
+ *
+ * @param target - 事件目标
+ * @returns 是可编辑元素返回 true
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
   }
+  const tag = target.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || target.isContentEditable;
+}
+
+/**
+ * 应用根组件
+ *
+ * 组装三大区块：
+ * - Header：顶部固定标题栏
+ * - SideNav：左侧导航
+ * - ContentArea：右侧内容区
+ *
+ * 持有 activeTab 状态（通过 useActiveTab hook 持久化到 localStorage）。
+ */
+function App(): React.ReactElement {
+  const [activeTab, setActiveTab] = useActiveTab();
+
+  // F6 可选：Ctrl/Cmd+, 跳转到设置页
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (!(event.metaKey || event.ctrlKey) || event.key !== ",") {
+        return;
+      }
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+      event.preventDefault();
+      setActiveTab("settings");
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [setActiveTab]);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div className="min-h-screen bg-background text-foreground">
+      <Header />
+      <SideNav activeTab={activeTab} onSwitch={setActiveTab} />
+      <ContentArea activeTab={activeTab} />
+    </div>
   );
 }
 
