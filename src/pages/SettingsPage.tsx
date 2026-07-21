@@ -74,8 +74,26 @@ export function SettingsPage(): React.ReactElement {
       {/* 目录卡片 */}
       <Card>
         <CardHeader>
-          <CardTitle>目录配置</CardTitle>
-          <CardDescription>添加应用需要访问的本地目录路径</CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1.5">
+              <CardTitle>目录配置</CardTitle>
+              <CardDescription>
+                添加应用需要访问的本地目录路径
+              </CardDescription>
+            </div>
+            {/* 新增目录按钮（标题右侧） */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={addItem}
+              disabled={isLoading}
+              aria-label="新增目录"
+              title="新增目录"
+              className="hover:border-orange-500 hover:bg-orange-500 hover:text-white"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-3">
@@ -103,16 +121,8 @@ export function SettingsPage(): React.ReactElement {
           {/* 空状态 */}
           {!isLoading && items.length === 0 && (
             <div className="border border-dashed rounded-lg border-border px-6 py-8 text-center text-sm text-muted-foreground">
-              暂无目录，点击下方添加
+              暂无目录，点击右上角 + 添加
             </div>
-          )}
-
-          {/* 添加按钮 */}
-          {!isLoading && (
-            <Button variant="outline" onClick={addItem} className="w-full">
-              <Plus className="mr-2 h-4 w-4" />
-              添加目录
-            </Button>
           )}
         </CardContent>
       </Card>

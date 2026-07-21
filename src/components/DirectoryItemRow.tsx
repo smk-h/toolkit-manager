@@ -4,7 +4,7 @@
  * File name  : DirectoryItemRow.tsx
  * Author     : sumu
  * Date       : 2026/07/21
- * Description: 目录项单行组件（名称+输入框+按钮组+校验提示）
+ * Description: 目录项卡片组件（名称+输入框+按钮组+校验提示）
  * ======================================================
  */
 
@@ -57,14 +57,14 @@ function basename(path: string): string {
 }
 
 /**
- * 目录项单行
+ * 目录项卡片
  *
- * 横向布局：名称 + 路径输入框 + 打开按钮 + 删除按钮。
+ * 卡片布局：第一行显示名称，第二行为路径输入框 + 打开/删除按钮。
  * 校验失败时输入框下方显示红字"目录不存在"。
  * 名称由路径派生（basename），路径为空时显示"未命名"。
  *
  * @param props - 组件属性
- * @returns 渲染后的行元素
+ * @returns 渲染后的卡片元素
  */
 export function DirectoryItemRow({
   item,
@@ -88,17 +88,17 @@ export function DirectoryItemRow({
   const errorId = `dir-error-${item.id}`;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {/* 主体行：名称 + 输入框 + 按钮组 */}
-      <div className="flex items-center gap-2">
-        {/* 名称（派生，只读展示，固定宽度避免长名称挤压输入框） */}
-        <span
-          className="w-24 flex-shrink-0 truncate text-sm text-muted-foreground"
-          title={name}
-        >
-          {name}
-        </span>
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm">
+      {/* 第一行：名称（派生，只读展示） */}
+      <span
+        className="truncate text-sm font-medium"
+        title={name}
+      >
+        {name}
+      </span>
 
+      {/* 第二行：路径输入框 + 按钮组 */}
+      <div className="flex items-center gap-2">
         {/* 路径输入框 */}
         <Input
           ref={inputRef}
@@ -117,6 +117,7 @@ export function DirectoryItemRow({
           aria-label="打开目录"
           title="打开目录"
           onClick={() => onPickDirectory(item.id)}
+          className="hover:border-orange-500 hover:bg-orange-500 hover:text-white"
         >
           <FolderOpen className="h-4 w-4" />
         </Button>
@@ -128,6 +129,7 @@ export function DirectoryItemRow({
           aria-label="删除目录"
           title="删除目录"
           onClick={() => onRemove(item.id)}
+          className="hover:bg-orange-500 hover:text-white"
         >
           <Trash2 className="h-4 w-4" />
         </Button>
@@ -137,7 +139,7 @@ export function DirectoryItemRow({
       {isInvalid && (
         <p
           id={errorId}
-          className="pl-[7.5rem] text-xs text-red-600 dark:text-red-400"
+          className="text-xs text-red-600 dark:text-red-400"
         >
           目录不存在
         </p>
