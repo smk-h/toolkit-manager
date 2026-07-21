@@ -64,7 +64,7 @@ function App(): React.ReactElement {
   }, [setActiveTab]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-screen overflow-hidden bg-background text-foreground">
       <Header />
       <SideNav activeTab={activeTab} onSwitch={setActiveTab} />
       <ContentArea activeTab={activeTab} />
