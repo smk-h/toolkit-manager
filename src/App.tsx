@@ -8,7 +8,7 @@
  * ======================================================
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { ContentArea } from "@/components/ContentArea";
 import { Header } from "@/components/Header";
@@ -44,6 +44,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
  */
 function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useActiveTab();
+  // 新增设备对话框开关：Header 按钮置 true，创建成功或取消时置 false
+  const [createOpen, setCreateOpen] = useState(false);
 
   // F6 可选：Ctrl/Cmd+, 跳转到设置页
   useEffect(() => {
@@ -66,9 +68,17 @@ function App(): React.ReactElement {
 
   return (
     <div className="h-screen overflow-hidden bg-background text-foreground">
-      <Header />
+      <Header
+        activeTab={activeTab}
+        onAddDevice={() => setCreateOpen(true)}
+      />
       <SideNav activeTab={activeTab} onSwitch={setActiveTab} />
-      <ContentArea activeTab={activeTab} onSwitch={setActiveTab} />
+      <ContentArea
+        activeTab={activeTab}
+        onSwitch={setActiveTab}
+        createOpen={createOpen}
+        onCreateClose={() => setCreateOpen(false)}
+      />
       <ToastContainer />
     </div>
   );

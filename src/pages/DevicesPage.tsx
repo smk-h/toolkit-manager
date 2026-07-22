@@ -13,11 +13,14 @@ import { useState } from "react";
 import { Settings } from "lucide-react";
 
 import { DeviceCard } from "@/components/DeviceCard";
+import { DeviceCreateDialog } from "@/components/DeviceCreateDialog";
 import { DeviceDeleteDialog } from "@/components/DeviceDeleteDialog";
 import { DeviceDetailDialog } from "@/components/DeviceDetailDialog";
 import { DeviceEditDialog } from "@/components/DeviceEditDialog";
 import { Button } from "@/components/ui/button";
+import { DEVICES_SUBDIR, PRESET_DEVICE_DIR_NAME } from "@/config/devices";
 import { useDevices } from "@/hooks/useDevices";
+import { useDirectoryConfig } from "@/hooks/useDirectoryConfig";
 import { useToast } from "@/hooks/useToast";
 import { copyText } from "@/lib/clipboard";
 import type { Device } from "@/types/device";
@@ -26,6 +29,10 @@ import type { Device } from "@/types/device";
 export interface DevicesPageProps {
   /** 跳转到设置页（引导态按钮触发） */
   onNavigateSettings: () => void;
+  /** 新增设备对话框受控开关（由 Header 按钮经 App 控制） */
+  createOpen: boolean;
+  /** 新增设备对话框关闭回调 */
+  onCreateClose: () => void;
 }
 
 /**
@@ -42,6 +49,8 @@ export interface DevicesPageProps {
  */
 export function DevicesPage({
   onNavigateSettings,
+  createOpen,
+  onCreateClose,
 }: DevicesPageProps): React.ReactElement {
   const { status, reload } = useDevices();
   const { show } = useToast();
@@ -51,6 +60,18 @@ export function DevicesPage({
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   // 删除对话框当前待删的设备
   const [deleteDevice, setDeleteDevice] = useState<Device | null>(null);
+
+  // 新增设备所需上下文：设备目录路径与现有设备名集合
+  // useDirectoryConfig 与 useDevices 内部一致，取预置项路径拼 devices 子目录
+  const { items: dirItems, isLoading: dirLoading } = useDirectoryConfig();
+  const presetItem = dirLoading
+    ? undefined
+    : dirItems.find((i) => i.isPreset && i.name === PRESET_DEVICE_DIR_NAME);
+  const devicesDir = presetItem?.path
+    ? `${presetItem.path.replace(/[\\/]+$/, "")}/${DEVICES_SUBDIR}`
+    : "";
+  const existingNames =
+    status.kind === "ready" ? status.devices.map((d) => d.name) : [];
 
   /**
    * 复制设备原始 yaml 全文到剪贴板
@@ -86,6 +107,13 @@ export function DevicesPage({
   const handleDeleteDone = (): void => {
     reload();
     setDeleteDevice(null);
+  };
+
+  /** 新增设备创建成功 */
+  const handleCreated = (deviceName: string): void => {
+    reload();
+    show(`设备「${deviceName}」已创建`, "success");
+    onCreateClose();
   };
 
   return (
@@ -172,6 +200,15 @@ export function DevicesPage({
         device={deleteDevice}
         onClose={() => setDeleteDevice(null)}
         onDeleted={handleDeleteDone}
+      />
+
+      {/* 新增设备对话框 */}
+      <DeviceCreateDialog
+        existingNames={existingNames}
+        devicesDir={devicesDir}
+        open={createOpen}
+        onClose={onCreateClose}
+        onCreated={handleCreated}
       />
     </div>
   );

@@ -12,7 +12,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { load } from "js-yaml";
 
-import { DEVICES_SUBDIR } from "@/config/devices";
+import { DEVICES_SUBDIR, TEMPLATE_FILE_NAME } from "@/config/devices";
 import type {
   AdbChannel,
   Device,
@@ -108,7 +108,7 @@ export function isAdbEnabled(adb: AdbChannel | undefined): boolean {
  * @param rawText - yaml 原始文本
  * @returns 解析成功的设备对象；解析失败返回 null
  */
-function parseDevice(name: string, filePath: string, rawText: string): Device | null {
+export function parseDevice(name: string, filePath: string, rawText: string): Device | null {
   try {
     const parsed = load(rawText);
     // yaml 顶层须为对象（含 adb/ssh/serial 通道）
@@ -325,29 +325,24 @@ export function replaceYamlFieldValue(
 }
 
 /**
- * 编辑保存：以文本级字段替换方式更新 YAML 文件
+ * 对 YAML 文本做字段级替换，返回替换后的文本（不写文件）
  *
- * 1. 读取原始 YAML 文本
- * 2. 用 parseYamlLines() 构建行索引
- * 3. 对每处变更调用 replaceYamlFieldValue() 做文本替换
- * 4. 将修改后的文本写回原文件
+ * 解析行索引 → 逐项查找目标行 → 调用 replaceYamlFieldValue 替换。
+ * 跳过值未实际变化的字段；从后往前替换避免行号偏移。
+ * 抽取为私有函数，供编辑保存与模板创建复用。
  *
- * 若所有字段值均未实际变更（update 中的值与原文一致），不触发写入。
- *
- * @param filePath - YAML 文件完整路径
- * @param updates - 点分路径 → 新值的映射
- * @returns 修改后的 YAML 文本
+ * @param rawText - 原始 YAML 文本
+ * @param updates - 点分路径 → 新值的映射（undefined 表示删除字段）
+ * @returns 替换后的 YAML 文本；无任何变更时与原文相同
  */
-export async function updateDeviceYaml(
-  filePath: string,
+function applyFieldUpdates(
+  rawText: string,
   updates: Record<string, string | number | undefined>,
-): Promise<string> {
-  // 读取原始文本
-  const rawText = await readTextFile(filePath);
+): string {
   const lines = rawText.split("\n");
   const index = parseYamlLines(rawText);
 
-  // 按行号排序（从后往前替换，避免行号偏移）
+  // 按行号收集变更（从后往前替换，避免行号偏移）
   const changes: Array<{ lineIndex: number; newLine: string }> = [];
 
   for (const [fieldPath, newValue] of Object.entries(updates)) {
@@ -379,19 +374,78 @@ export async function updateDeviceYaml(
 
   // 从后往前替换，避免行号偏移
   changes.sort((a, b) => b.lineIndex - a.lineIndex);
-
   for (const { lineIndex, newLine } of changes) {
     lines[lineIndex] = newLine;
   }
 
-  const newText = lines.join("\n");
+  return lines.join("\n");
+}
+
+/**
+ * 编辑保存：以文本级字段替换方式更新 YAML 文件
+ *
+ * 1. 读取原始 YAML 文本
+ * 2. 用 applyFieldUpdates() 做文本替换
+ * 3. 有实际变更才写回原文件
+ *
+ * 若所有字段值均未实际变更（update 中的值与原文一致），不触发写入。
+ *
+ * @param filePath - YAML 文件完整路径
+ * @param updates - 点分路径 → 新值的映射
+ * @returns 修改后的 YAML 文本
+ */
+export async function updateDeviceYaml(
+  filePath: string,
+  updates: Record<string, string | number | undefined>,
+): Promise<string> {
+  // 读取原始文本
+  const rawText = await readTextFile(filePath);
+  const newText = applyFieldUpdates(rawText, updates);
 
   // 有实际变更才写入
-  if (changes.length > 0) {
+  if (newText !== rawText) {
     await writeTextFile(filePath, newText);
   }
 
   return newText;
+}
+
+/**
+ * 从模板创建新设备
+ *
+ * 1. 读取模板 `${devicesDir}/${TEMPLATE_FILE_NAME}.yaml` 的原始文本
+ * 2. 对用户修改的字段做文本级替换（复用 applyFieldUpdates）
+ * 3. 将替换后的文本写入 `${devicesDir}/${name}.yaml`
+ *
+ * 模板读取失败（文件不存在/损坏）或写入失败时抛错，由调用方捕获后 toast 提示。
+ * fieldUpdates 为空时直接拷贝模板原文（用户未修改任何字段）。
+ *
+ * @param devicesDir - 设备目录完整路径（末尾不带分隔符）
+ * @param name - 新设备名（已通过校验：无非法字符、无重名）
+ * @param fieldUpdates - 用户修改的字段点分路径 → 新值映射（未修改字段不传入）
+ * @returns 新设备的完整文件路径
+ * @throws 模板读取失败或文件写入失败时抛出底层错误
+ */
+export async function createDeviceFromTemplate(
+  devicesDir: string,
+  name: string,
+  fieldUpdates: Record<string, string | number | undefined>,
+): Promise<string> {
+  // 读取模板原文（失败由调用方 toast）
+  const templatePath = `${devicesDir}/${TEMPLATE_FILE_NAME}.yaml`;
+  const templateText = await readTextFile(templatePath);
+
+  // 用户未改任何字段：直接拷贝模板原文
+  const newText =
+    Object.keys(fieldUpdates).length > 0
+      ? applyFieldUpdates(templateText, fieldUpdates)
+      : templateText;
+
+  // 写入新设备文件（失败由调用方 toast）
+  const targetPath = `${devicesDir}/${name}.yaml`;
+  await writeTextFile(targetPath, newText);
+
+  return targetPath;
 }
 
 /**
