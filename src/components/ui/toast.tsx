@@ -4,7 +4,7 @@
  * File name  : toast.tsx (ui)
  * Author     : sumu
  * Date       : 2026/07/22
- * Description: 轻量全局提示渲染器（右上角堆叠，framer-motion 淡入淡出）
+ * Description: 轻量全局提示渲染器（右下角堆叠，framer-motion 淡入淡出）
  * ======================================================
  */
 
@@ -23,7 +23,7 @@ const TOAST_STYLE: Record<ToastItem["type"], string> = {
 /**
  * 全局 toast 容器
  *
- * 消费 useToast 全局队列，固定在右上角堆叠展示，逐条淡入淡出。
+ * 消费 useToast 全局队列，固定在右下角堆叠展示，逐条淡入淡出。
  * 应在应用根挂载一次，所有页面共享同一实例。
  *
  * @returns 渲染后的 toast 容器
@@ -32,15 +32,15 @@ export function ToastContainer(): React.ReactElement {
   const { toasts, dismiss } = useToast();
 
   return (
-    <div className="pointer-events-none fixed right-4 top-4 z-[60] flex flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col gap-2">
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
             layout
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 40 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.2 }}
             onClick={() => dismiss(toast.id)}
             className={cn(
