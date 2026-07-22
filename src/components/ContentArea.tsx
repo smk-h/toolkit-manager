@@ -26,15 +26,21 @@ export interface ContentAreaProps {
   createOpen: boolean;
   /** 新增设备对话框关闭回调（透传给设备页） */
   onCreateClose: () => void;
+  /** 新增项目受控开关（透传给项目页，触发一次 addItem） */
+  projectCreateOpen: boolean;
+  /** 新增项目开关关闭回调（透传给项目页） */
+  onProjectCreateClose: () => void;
 }
 
 /**
  * 根据 activeTab 返回对应页面元素
  *
  * @param activeTab - 当前标签
- * @param onSwitch - 切换标签回调（仅 devices 页需要跳转能力）
+ * @param onSwitch - 切换标签回调（仅 devices/projects 页需要跳转能力）
  * @param createOpen - 新增设备对话框开关（仅 devices 页使用）
  * @param onCreateClose - 新增设备对话框关闭回调
+ * @param projectCreateOpen - 新增项目开关（仅 projects 页使用）
+ * @param onProjectCreateClose - 新增项目开关关闭回调
  * @returns 对应的页面 React 元素
  */
 function renderPage(
@@ -42,6 +48,8 @@ function renderPage(
   onSwitch: (tab: TabId) => void,
   createOpen: boolean,
   onCreateClose: () => void,
+  projectCreateOpen: boolean,
+  onProjectCreateClose: () => void,
 ): React.ReactElement {
   switch (activeTab) {
     case "devices":
@@ -53,7 +61,13 @@ function renderPage(
         />
       );
     case "projects":
-      return <ProjectsPage />;
+      return (
+        <ProjectsPage
+          onNavigateSettings={() => onSwitch("settings")}
+          createOpen={projectCreateOpen}
+          onCreateClose={onProjectCreateClose}
+        />
+      );
     case "settings":
       return <SettingsPage />;
     case "about":
@@ -83,6 +97,8 @@ export function ContentArea({
   onSwitch,
   createOpen,
   onCreateClose,
+  projectCreateOpen,
+  onProjectCreateClose,
 }: ContentAreaProps): React.ReactElement {
   return (
     <main className="ml-14 mt-16 h-[calc(100vh-4rem)] overflow-auto">
@@ -95,7 +111,14 @@ export function ContentArea({
           transition={{ duration: 0.2 }}
           className="min-h-full p-6 pb-10"
         >
-          {renderPage(activeTab, onSwitch, createOpen, onCreateClose)}
+          {renderPage(
+            activeTab,
+            onSwitch,
+            createOpen,
+            onCreateClose,
+            projectCreateOpen,
+            onProjectCreateClose,
+          )}
         </motion.div>
       </AnimatePresence>
     </main>

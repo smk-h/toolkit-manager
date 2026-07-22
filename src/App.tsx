@@ -46,6 +46,8 @@ function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useActiveTab();
   // 新增设备对话框开关：Header 按钮置 true，创建成功或取消时置 false
   const [createOpen, setCreateOpen] = useState(false);
+  // 新增项目开关：Header 按钮置 true，触发一次 addItem 后置 false
+  const [projectCreateOpen, setProjectCreateOpen] = useState(false);
 
   // F6 可选：Ctrl/Cmd+, 跳转到设置页
   useEffect(() => {
@@ -71,6 +73,7 @@ function App(): React.ReactElement {
       <Header
         activeTab={activeTab}
         onAddDevice={() => setCreateOpen(true)}
+        onAddProject={() => setProjectCreateOpen(true)}
       />
       <SideNav activeTab={activeTab} onSwitch={setActiveTab} />
       <ContentArea
@@ -78,6 +81,8 @@ function App(): React.ReactElement {
         onSwitch={setActiveTab}
         createOpen={createOpen}
         onCreateClose={() => setCreateOpen(false)}
+        projectCreateOpen={projectCreateOpen}
+        onProjectCreateClose={() => setProjectCreateOpen(false)}
       />
       <ToastContainer />
     </div>
