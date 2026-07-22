@@ -9,6 +9,7 @@
  */
 
 import { Dialog } from "@/components/ui/dialog";
+import { MASKED_VALUE } from "@/config/devices";
 import { isAdbEnabled, isSerialEnabled, isSshEnabled } from "@/lib/devices";
 import type { Device } from "@/types/device";
 
@@ -26,6 +27,21 @@ interface FieldRow {
   label: string;
   /** 字段值（undefined 表示该字段未配置） */
   value: string | number | undefined;
+}
+
+/**
+ * 对敏感字段值进行脱敏处理
+ *
+ * 非空字符串按原长度用 {@link MASKED_VALUE} 重复填充以保留长度信息，
+ * 否则返回 undefined 以在渲染层走默认的 "-" 逻辑。
+ *
+ * @param value - 原始值
+ * @returns 脱敏后的值或 undefined
+ */
+function maskSensitive(
+  value: string | undefined,
+): string | undefined {
+  return value ? MASKED_VALUE.repeat(value.length) : undefined;
 }
 
 /**
@@ -70,7 +86,7 @@ function renderChannelBlock(
  * 设备详情对话框
  *
  * 分 SSH / Serial / ADB 三区块展示设备完整配置。
- * 详情场景需核对完整配置，password 等明文展示。
+ * password 等敏感字段默认用 {MASKED_VALUE} 脱敏展示。
  *
  * @param props - 组件属性
  * @returns 渲染后的 Dialog 元素
@@ -90,7 +106,7 @@ export function DeviceDetailDialog({
             { label: "host", value: device.ssh?.host },
             { label: "port", value: device.ssh?.port },
             { label: "username", value: device.ssh?.username },
-            { label: "password", value: device.ssh?.password },
+            { label: "password", value: maskSensitive(device.ssh?.password) },
             { label: "keyProvider.mode", value: device.ssh?.keyProvider?.mode },
           ])}
 
@@ -99,7 +115,7 @@ export function DeviceDetailDialog({
             { label: "port", value: device.serial?.port },
             { label: "baudRate", value: device.serial?.baudRate },
             { label: "loginUsername", value: device.serial?.loginUsername },
-            { label: "loginPassword", value: device.serial?.loginPassword },
+            { label: "loginPassword", value: maskSensitive(device.serial?.loginPassword) },
             {
               label: "keyProvider.mode",
               value: device.serial?.keyProvider?.mode,
