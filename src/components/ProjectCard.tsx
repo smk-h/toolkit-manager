@@ -30,6 +30,10 @@ export interface ProjectCardProps {
   toolkitPath: string;
   /** 路径是否与其它项目重复（由页面层跨项比对计算） */
   isDuplicate: boolean;
+  /**
+   * 全局 MCP 是否已启用（true 时配置按钮强制禁用，优先级高于项目自身状态）
+   */
+  globalEnabled: boolean;
   /** 路径变化回调（即时保存由父组件处理） */
   onPathChange: (id: string, path: string) => void;
   /** 打开目录选择器并填充路径的回调 */
@@ -87,7 +91,7 @@ function renderStatusBadge(status: ProjectConfigStatus): React.ReactNode {
  * 第二行为「打开」「配置」「删除」按钮组，下方为警告提示区。
  *
  * - 状态检测：path 变化时防抖触发 detectProjectStatus
- * - 配置按钮：仅非 OK 态可点，成功后刷新徽章
+ * - 配置按钮：全局启用或项目 OK 时禁用，其余态可点，成功后刷新徽章
  * - 删除按钮：仅清理记录，不触碰项目目录文件
  * - 警告：重复路径 / 路径不存在（红字提示，不阻断操作）
  *
@@ -98,6 +102,7 @@ export function ProjectCard({
   item,
   toolkitPath,
   isDuplicate,
+  globalEnabled,
   onPathChange,
   onPickDirectory,
   onRemove,
@@ -157,8 +162,9 @@ export function ProjectCard({
     }
   };
 
-  // 配置按钮可用性：仅 OK 态禁用
+  // 配置按钮可用性：全局启用或项目 OK 时禁用（全局优先级更高）
   const isConfigured = status.kind === "ok";
+  const configDisabled = globalEnabled || isConfigured;
   // 是否显示路径不存在警告（仅检测已完成且非 idle/checking 时有意义）
   // 此处用 status 推断：not-configured/config-error 可能因路径本身问题，
   // 但路径存在性由专门的检测更准确——这里用一个轻量 exists 判断
@@ -211,11 +217,17 @@ export function ProjectCard({
           variant="outline"
           size="icon"
           aria-label="配置 MCP"
-          title={isConfigured ? "已配置" : "配置 MCP"}
-          disabled={isConfigured}
+          title={
+            globalEnabled
+              ? "全局配置已启用，项目级配置已禁用"
+              : isConfigured
+                ? "已配置"
+                : "配置 MCP"
+          }
+          disabled={configDisabled}
           onClick={handleConfig}
           className={
-            isConfigured
+            configDisabled
               ? "opacity-50"
               : "hover:border-orange-500 hover:bg-orange-500 hover:text-white"
           }

@@ -28,6 +28,10 @@ export interface ProjectsPageProps {
   createOpen: boolean;
   /** 新增项目开关关闭回调 */
   onCreateClose: () => void;
+  /**
+   * 全局 MCP 是否已启用（由 App 层持有，透传给 ProjectCard 联动禁用配置按钮）
+   */
+  globalMcpChecked: boolean;
 }
 
 /**
@@ -37,6 +41,8 @@ export interface ProjectsPageProps {
  * - useDirectoryConfig 取 toolkit 预置项路径（toolkit 为空/不存在 → 引导态）
  * - useProjects 取项目列表（toolkit 正常 → 渲染卡片列表）
  * - createOpen 由 Header「新增项目」触发，置 true 时 addItem 一次并关闭
+ * - globalMcpChecked 由 App 层透传，仅用于联动禁用项目卡片配置按钮
+ *   （全局开关的编排逻辑在 App 层，本组件不参与）
  *
  * @param props - 组件属性
  * @returns 渲染后的页面元素
@@ -45,6 +51,7 @@ export function ProjectsPage({
   onNavigateSettings,
   createOpen,
   onCreateClose,
+  globalMcpChecked,
 }: ProjectsPageProps): React.ReactElement {
   const { items, isLoading, addItem, updatePath, removeItem } = useProjects();
   const { items: dirItems, isLoading: dirLoading } = useDirectoryConfig();
@@ -155,6 +162,7 @@ export function ProjectsPage({
                   item={item}
                   toolkitPath={toolkitPath}
                   isDuplicate={isDuplicatePath(item)}
+                  globalEnabled={globalMcpChecked}
                   autoFocus={index === items.length - 1 && item.path === ""}
                   onPathChange={updatePath}
                   onPickDirectory={handlePickDirectory}

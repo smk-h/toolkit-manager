@@ -30,6 +30,8 @@ export interface ContentAreaProps {
   projectCreateOpen: boolean;
   /** 新增项目开关关闭回调（透传给项目页） */
   onProjectCreateClose: () => void;
+  /** 全局 MCP 是否已启用（透传给项目页，联动禁用卡片配置按钮） */
+  globalMcpChecked: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export interface ContentAreaProps {
  * @param onCreateClose - 新增设备对话框关闭回调
  * @param projectCreateOpen - 新增项目开关（仅 projects 页使用）
  * @param onProjectCreateClose - 新增项目开关关闭回调
+ * @param globalMcpChecked - 全局 MCP 状态（仅 projects 页使用）
  * @returns 对应的页面 React 元素
  */
 function renderPage(
@@ -50,6 +53,7 @@ function renderPage(
   onCreateClose: () => void,
   projectCreateOpen: boolean,
   onProjectCreateClose: () => void,
+  globalMcpChecked: boolean,
 ): React.ReactElement {
   switch (activeTab) {
     case "devices":
@@ -66,6 +70,7 @@ function renderPage(
           onNavigateSettings={() => onSwitch("settings")}
           createOpen={projectCreateOpen}
           onCreateClose={onProjectCreateClose}
+          globalMcpChecked={globalMcpChecked}
         />
       );
     case "settings":
@@ -99,6 +104,7 @@ export function ContentArea({
   onCreateClose,
   projectCreateOpen,
   onProjectCreateClose,
+  globalMcpChecked,
 }: ContentAreaProps): React.ReactElement {
   return (
     <main className="ml-14 mt-16 h-[calc(100vh-4rem)] overflow-auto">
@@ -118,6 +124,7 @@ export function ContentArea({
             onCreateClose,
             projectCreateOpen,
             onProjectCreateClose,
+            globalMcpChecked,
           )}
         </motion.div>
       </AnimatePresence>
