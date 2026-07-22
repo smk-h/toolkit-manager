@@ -4,7 +4,7 @@
  * File name  : ProjectCard.tsx
  * Author     : sumu
  * Date       : 2026/07/22
- * Description: 项目卡片组件（路径输入 + 打开 + 配置 + 删除 + 状态徽章 + 警告）
+ * Description: 项目卡片组件（路径输入 + 打开 + 配置 + 删除 + 状态徽章 + 警告 + 手动刷新 refreshKey）
  * ======================================================
  */
 
@@ -34,6 +34,13 @@ export interface ProjectCardProps {
    * 全局 MCP 是否已启用（true 时配置按钮强制禁用，优先级高于项目自身状态）
    */
   globalEnabled: boolean;
+  /**
+   * 刷新信号，变化时重新检测 MCP 状态
+   *
+   * 外部改了 .mcp.json 但项目路径未变时，状态检测 effect 不会因 path
+   * 变化而重跑——本字段递增后驱动 effect 重新执行，使徽章反映磁盘最新状态。
+   */
+  refreshKey: number;
   /** 路径变化回调（即时保存由父组件处理） */
   onPathChange: (id: string, path: string) => void;
   /** 打开目录选择器并填充路径的回调 */
@@ -103,6 +110,7 @@ export function ProjectCard({
   toolkitPath,
   isDuplicate,
   globalEnabled,
+  refreshKey,
   onPathChange,
   onPickDirectory,
   onRemove,
@@ -121,7 +129,7 @@ export function ProjectCard({
     }
   }, [autoFocus]);
 
-  // 防抖状态检测：path 或 toolkitPath 变化时延迟检测
+  // 防抖状态检测：path、toolkitPath 或 refreshKey 变化时延迟检测
   useEffect(() => {
     // 空路径：直接 idle，不触发 fs 调用
     if (!item.path.trim()) {
@@ -144,7 +152,7 @@ export function ProjectCard({
     return () => {
       clearTimeout(timer);
     };
-  }, [item.path, toolkitPath]);
+  }, [item.path, toolkitPath, refreshKey]);
 
   /**
    * 一键配置：写入/修正两文件，成功后刷新徽章

@@ -4,16 +4,19 @@
  * File name  : Header.tsx
  * Author     : sumu
  * Date       : 2026/07/21
- * Description: 顶部固定标题栏（含设备页新增入口、项目页新增与全局 MCP 开关）
+ * Description: 顶部固定标题栏（含设备页新增入口、项目页新增与全局 MCP 开关、手动刷新按钮）
  * ======================================================
  */
 
-import { Plus } from "lucide-react";
+import { useState } from "react";
+
+import { Plus, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { GlobalMcpSwitch } from "@/components/GlobalMcpSwitch";
 import { APP_META } from "@/config/nav";
 import type { TabId } from "@/config/nav";
+import { cn } from "@/lib/utils";
 
 /** Header 组件属性 */
 export interface HeaderProps {
@@ -27,6 +30,8 @@ export interface HeaderProps {
   globalMcpChecked: boolean;
   /** 全局 MCP 开关切换回调（仅 projects tab 显示开关） */
   onGlobalMcpToggle: (checked: boolean) => void;
+  /** 刷新按钮点击回调（递增 refreshTick + 重读全局 MCP） */
+  onRefresh: () => void;
 }
 
 /**
@@ -47,7 +52,24 @@ export function Header({
   onAddProject,
   globalMcpChecked,
   onGlobalMcpToggle,
+  onRefresh,
 }: HeaderProps): React.ReactElement {
+  // 刷新按钮旋转动画：纯视觉反馈，与实际数据加载解耦
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  /**
+   * 刷新按钮点击处理
+   *
+   * 触发外部刷新回调，并立即开始图标旋转动画；
+   * 固定 500ms 后停止（数据读取通常 <100ms，500ms 给足视觉感知）。
+   */
+  const handleRefreshClick = (): void => {
+    setIsRefreshing(true);
+    onRefresh();
+    setTimeout((): void => {
+      setIsRefreshing(false);
+    }, 500);
+  };
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border bg-background/80 backdrop-blur-md"
@@ -57,26 +79,49 @@ export function Header({
           {APP_META.name}
         </h1>
         <div className="flex items-center gap-2">
-          {/* 设备页显示新增入口；其余 tab 不渲染该按钮 */}
+          {/* 设备页显示刷新 + 新增入口；刷新在左，新增在右 */}
           {/* ghost 默认透明，与 DeviceCard 操作按钮一致；悬浮时橙色高亮 */}
           {activeTab === "devices" && (
-            <Button
-              onClick={onAddDevice}
-              variant="ghost"
-              size="sm"
-              className="hover:bg-orange-500 hover:text-white"
-            >
-              <Plus className="h-4 w-4" />
-              新增设备
-            </Button>
+            <>
+              <Button
+                onClick={handleRefreshClick}
+                variant="ghost"
+                size="sm"
+                aria-label="刷新设备列表"
+                title="刷新设备列表"
+                className="hover:bg-orange-500 hover:text-white"
+              >
+                <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+                刷新
+              </Button>
+              <Button
+                onClick={onAddDevice}
+                variant="ghost"
+                size="sm"
+                className="hover:bg-orange-500 hover:text-white"
+              >
+                <Plus className="h-4 w-4" />
+                新增设备
+              </Button>
+            </>
           )}
-          {/* 项目页显示全局 MCP 开关 + 新增入口；开关在左，按钮在右 */}
+          {/* 项目页显示全局 MCP 开关 + 刷新 + 新增入口；开关在左，刷新居中，按钮在右 */}
           {activeTab === "projects" && (
             <>
               <GlobalMcpSwitch
                 checked={globalMcpChecked}
                 onCheckedChange={onGlobalMcpToggle}
               />
+              <Button
+                onClick={handleRefreshClick}
+                variant="ghost"
+                size="icon"
+                aria-label="刷新项目列表"
+                title="刷新项目列表"
+                className="hover:bg-orange-500 hover:text-white"
+              >
+                <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              </Button>
               <Button
                 onClick={onAddProject}
                 variant="ghost"

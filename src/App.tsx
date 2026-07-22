@@ -4,7 +4,7 @@
  * File name  : App.tsx
  * Author     : sumu
  * Date       : 2026/07/21
- * Description: 应用根组件（三栏布局 + 路由状态 + 全局 MCP 开关编排）
+ * Description: 应用根组件（三栏布局 + 路由状态 + 全局 MCP 开关编排 + 手动刷新编排）
  * ======================================================
  */
 
@@ -63,6 +63,8 @@ function App(): React.ReactElement {
 
   // 全局 MCP 开关状态（唯一来源是 ~/.claude.json，不持久化到应用 settings.json）
   const [globalMcpChecked, setGlobalMcpChecked] = useState(false);
+  // 手动刷新计数器：Header 按钮点击时递增，驱动当前页签重读外部配置
+  const [refreshTick, setRefreshTick] = useState<number>(0);
   // 全局 MCP 确认对话框：null 关闭，"enable"/"disable" 表示待确认操作
   const [globalMcpConfirmAction, setGlobalMcpConfirmAction] = useState<
     "enable" | "disable" | null
@@ -154,6 +156,23 @@ function App(): React.ReactElement {
     }
   }, [globalMcpConfirmAction, toolkitPath, show]);
 
+  /**
+   * 手动刷新当前页签数据 + 全局 MCP 状态
+   *
+   * 递增 refreshTick 驱动当前页签重读外部配置文件（设备 YAML / 项目 MCP 状态），
+   * 同时重读 ~/.claude.json 刷新全局 MCP 开关状态。
+   * 全局 MCP 重读失败时静默降级，不阻断页面数据刷新。
+   */
+  const handleRefresh = useCallback(async (): Promise<void> => {
+    setRefreshTick((t) => t + 1);
+    try {
+      const status = await detectGlobalMcp();
+      setGlobalMcpChecked(status.kind === "enabled");
+    } catch (error) {
+      console.warn("[App] refresh global mcp failed:", error);
+    }
+  }, []);
+
   return (
     <div className="h-screen overflow-hidden bg-background text-foreground">
       <Header
@@ -162,6 +181,7 @@ function App(): React.ReactElement {
         onAddProject={() => setProjectCreateOpen(true)}
         globalMcpChecked={globalMcpChecked}
         onGlobalMcpToggle={handleGlobalMcpToggle}
+        onRefresh={handleRefresh}
       />
       <SideNav activeTab={activeTab} onSwitch={setActiveTab} />
       <ContentArea
@@ -172,6 +192,7 @@ function App(): React.ReactElement {
         projectCreateOpen={projectCreateOpen}
         onProjectCreateClose={() => setProjectCreateOpen(false)}
         globalMcpChecked={globalMcpChecked}
+        refreshTick={refreshTick}
       />
       <ToastContainer />
       {/* 全局 MCP 确认对话框（App 层统一编排） */}

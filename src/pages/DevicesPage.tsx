@@ -4,11 +4,11 @@
  * File name  : DevicesPage.tsx
  * Author     : sumu
  * Date       : 2026/07/22
- * Description: 设备管理页（读取 yaml 设备配置 + 引导态 + 详情/复制）
+ * Description: 设备管理页（读取 yaml 设备配置 + 引导态 + 详情/复制 + 手动刷新监听）
  * ======================================================
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Settings } from "lucide-react";
 
@@ -33,6 +33,8 @@ export interface DevicesPageProps {
   createOpen: boolean;
   /** 新增设备对话框关闭回调 */
   onCreateClose: () => void;
+  /** 刷新计数器，>0 时触发 reload */
+  refreshTick: number;
 }
 
 /**
@@ -51,6 +53,7 @@ export function DevicesPage({
   onNavigateSettings,
   createOpen,
   onCreateClose,
+  refreshTick,
 }: DevicesPageProps): React.ReactElement {
   const { status, reload } = useDevices();
   const { show } = useToast();
@@ -60,6 +63,15 @@ export function DevicesPage({
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   // 删除对话框当前待删的设备
   const [deleteDevice, setDeleteDevice] = useState<Device | null>(null);
+
+  // 手动刷新：refreshTick 递增时重读设备配置
+  // refreshTick 初始为 0，首次挂载不触发（避免与 useDevices 自身的挂载加载重复）
+  // 故意不将 reload 纳入依赖：reload 来自 useCallback([])，引用稳定永不变化
+  useEffect(() => {
+    if (refreshTick > 0) {
+      reload();
+    }
+  }, [refreshTick]);
 
   // 新增设备所需上下文：设备目录路径与现有设备名集合
   // useDirectoryConfig 与 useDevices 内部一致，取预置项路径拼 devices 子目录

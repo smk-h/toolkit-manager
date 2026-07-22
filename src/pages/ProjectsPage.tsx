@@ -4,7 +4,7 @@
  * File name  : ProjectsPage.tsx
  * Author     : sumu
  * Date       : 2026/07/22
- * Description: 项目管理页（项目级 MCP 配置 + 引导态）
+ * Description: 项目管理页（项目级 MCP 配置 + 引导态 + 手动刷新透传）
  * ======================================================
  */
 
@@ -32,6 +32,8 @@ export interface ProjectsPageProps {
    * 全局 MCP 是否已启用（由 App 层持有，透传给 ProjectCard 联动禁用配置按钮）
    */
   globalMcpChecked: boolean;
+  /** 刷新计数器，透传给 ProjectCard 作为 refreshKey */
+  refreshTick: number;
 }
 
 /**
@@ -52,6 +54,7 @@ export function ProjectsPage({
   createOpen,
   onCreateClose,
   globalMcpChecked,
+  refreshTick,
 }: ProjectsPageProps): React.ReactElement {
   const { items, isLoading, addItem, updatePath, removeItem } = useProjects();
   const { items: dirItems, isLoading: dirLoading } = useDirectoryConfig();
@@ -161,6 +164,7 @@ export function ProjectsPage({
                   key={item.id}
                   item={item}
                   toolkitPath={toolkitPath}
+                  refreshKey={refreshTick}
                   isDuplicate={isDuplicatePath(item)}
                   globalEnabled={globalMcpChecked}
                   autoFocus={index === items.length - 1 && item.path === ""}
