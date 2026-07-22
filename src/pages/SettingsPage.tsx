@@ -10,8 +10,10 @@
 
 import { useCallback } from "react";
 
+import { appDataDir, join } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Plus } from "lucide-react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { FolderOpen, Plus } from "lucide-react";
 
 import { DirectoryItemRow } from "@/components/DirectoryItemRow";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useDirectoryConfig } from "@/hooks/useDirectoryConfig";
+import { useToast } from "@/hooks/useToast";
+import { STORE_FILE } from "@/config/settings";
 
 /**
  * 设置页
@@ -36,6 +40,7 @@ import { useDirectoryConfig } from "@/hooks/useDirectoryConfig";
 export function SettingsPage(): React.ReactElement {
   const { items, isLoading, addItem, removeItem, updatePath, updateName } =
     useDirectoryConfig();
+  const { show } = useToast();
 
   /**
    * 打开系统文件夹选择器
@@ -61,6 +66,25 @@ export function SettingsPage(): React.ReactElement {
     [updatePath],
   );
 
+  /**
+   * 打开配置文件所在目录
+   *
+   * 通过 appDataDir 获取 Tauri Store 的数据目录
+   * （Windows：%APPDATA%\com.tauri-app.toolkit-manager），
+   * 拼接 settings.json 后用系统资源管理器打开并选中该文件，
+   * 方便用户查看/备份配置文件。
+   */
+  const handleOpenConfigDir = useCallback(async (): Promise<void> => {
+    try {
+      const dir = await appDataDir();
+      const filePath = await join(dir, STORE_FILE);
+      await revealItemInDir(filePath);
+    } catch (error) {
+      console.warn("[SettingsPage] open config dir failed:", error);
+      show("打开配置目录失败", "error");
+    }
+  }, [show]);
+
   return (
     <div className="space-y-6">
       {/* 标题区 */}
@@ -81,18 +105,30 @@ export function SettingsPage(): React.ReactElement {
                 添加应用需要访问的本地目录路径
               </CardDescription>
             </div>
-            {/* 新增目录按钮（标题右侧） */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={addItem}
-              disabled={isLoading}
-              aria-label="新增目录"
-              title="新增目录"
-              className="hover:border-orange-500 hover:bg-orange-500 hover:text-white"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            {/* 右侧按钮组：打开配置目录 + 新增目录 */}
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleOpenConfigDir}
+                aria-label="打开配置目录"
+                title="打开配置目录"
+                className="hover:border-orange-500 hover:bg-orange-500 hover:text-white"
+              >
+                <FolderOpen className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={addItem}
+                disabled={isLoading}
+                aria-label="新增目录"
+                title="新增目录"
+                className="hover:border-orange-500 hover:bg-orange-500 hover:text-white"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
