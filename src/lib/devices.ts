@@ -8,7 +8,8 @@
  * ======================================================
  */
 
-import { readDir, readTextFile } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
+import { readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { load } from "js-yaml";
 
 import { DEVICES_SUBDIR } from "@/config/devices";
@@ -103,10 +104,11 @@ export function isAdbEnabled(adb: AdbChannel | undefined): boolean {
  * rawYaml 始终保留原文，供复制与详情展示。
  *
  * @param name - 设备名（文件名去扩展名）
+ * @param filePath - YAML 文件完整路径
  * @param rawText - yaml 原始文本
  * @returns 解析成功的设备对象；解析失败返回 null
  */
-function parseDevice(name: string, rawText: string): Device | null {
+function parseDevice(name: string, filePath: string, rawText: string): Device | null {
   try {
     const parsed = load(rawText);
     // yaml 顶层须为对象（含 adb/ssh/serial 通道）
@@ -116,6 +118,7 @@ function parseDevice(name: string, rawText: string): Device | null {
     const obj = parsed as Record<string, unknown>;
     return {
       name,
+      filePath,
       ssh: (obj.ssh as SshChannel | undefined) ?? undefined,
       serial: (obj.serial as SerialChannel | undefined) ?? undefined,
       adb: (obj.adb as AdbChannel | undefined) ?? undefined,
@@ -173,7 +176,7 @@ export async function readDevices(basePath: string): Promise<DevicesStatus> {
     const filePath = `${devicesDir}/${entry.name}`;
     try {
       const text = await readTextFile(filePath);
-      const device = parseDevice(stripExtension(entry.name), text);
+      const device = parseDevice(stripExtension(entry.name), filePath, text);
       if (device) {
         devices.push(device);
       }
@@ -184,4 +187,218 @@ export async function readDevices(basePath: string): Promise<DevicesStatus> {
   }
 
   return { kind: "ready", devices };
+}
+
+/**
+ * YAML 文件中一行文本的解析结果（仅 scalar 行）
+ */
+export interface YamlLineEntry {
+  /** 累积点分路径，如 ["ssh", "password"] */
+  path: string[];
+  /** 0-based 行号 */
+  lineIndex: number;
+  /** 前导空格数 */
+  indent: number;
+  /** 行中冒号前的 key 名 */
+  key: string;
+  /** 冒号后到行尾的原始文本 */
+  valueRaw: string;
+  /** 值内容在 rawLine 中的起始字符偏移 */
+  valueStart: number;
+}
+
+/**
+ * 解析 YAML 文本为行索引列表
+ *
+ * 逐行扫描，跟踪缩进级别来构建每个 scalar 字段的点分路径。
+ * 仅含 scalar 行（key: value），跳过空行、纯注释行、container 行。
+ *
+ * @param yamlText - 原始 YAML 文本
+ * @returns 行索引列表
+ */
+export function parseYamlLines(yamlText: string): YamlLineEntry[] {
+  const lines = yamlText.split("\n");
+  const entries: YamlLineEntry[] = [];
+  // 缩进栈：记录当前路径及缩进级别
+  const indentStack: Array<{ path: string[]; indent: number }> = [
+    { path: [], indent: -1 },
+  ];
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const rawLine = lines[lineIndex];
+
+    // 跳过空行与纯注释行
+    if (rawLine.trim() === "" || rawLine.trim().startsWith("#")) {
+      continue;
+    }
+
+    // 计算前导空格
+    const indentMatch = rawLine.match(/^(\s*)/);
+    const indent = indentMatch ? indentMatch[1].length : 0;
+
+    // 回溯缩进栈到当前缩进级别
+    while (indent <= indentStack[indentStack.length - 1].indent) {
+      indentStack.pop();
+    }
+
+    // 匹配 key: value 或 key:
+    const lineMatch = rawLine.match(
+      /^(\s*)(\S[\w.-]*):(\s*)(.*)$/,
+    );
+    if (!lineMatch) {
+      continue;
+    }
+
+    const key = lineMatch[2];
+    const colonSpace = lineMatch[3];
+    const valuePart = lineMatch[4].trimEnd();
+
+    // 当前路径（父级路径）
+    const currentPath = indentStack[indentStack.length - 1].path;
+
+    if (valuePart === "" || valuePart.startsWith("#")) {
+      // container 行（仅有 key:）或 key: #comment
+      indentStack.push({ path: [...currentPath, key], indent });
+      continue;
+    }
+
+    // scalar 行（key: value）
+    const keyEndIndex = rawLine.indexOf(":");
+    const valueStart = keyEndIndex + 1 + colonSpace.length;
+
+    entries.push({
+      path: [...currentPath, key],
+      lineIndex,
+      indent,
+      key,
+      valueRaw: valuePart,
+      valueStart,
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * 对单行 YAML 文本做值替换
+ *
+ * 保留前导空格和 key，仅替换值部分。
+ * undefined 时返回空字符串（删除字段）。
+ * 保留原值的引号风格（无引号 / 单引号 / 双引号）。
+ *
+ * @param rawLine - 原始行文本
+ * @param newValue - 新值；undefined 表示删除该行
+ * @returns 替换后的行文本
+ */
+export function replaceYamlFieldValue(
+  rawLine: string,
+  newValue: string | number | undefined,
+): string {
+  if (newValue === undefined) {
+    return "";
+  }
+
+  const colonIndex = rawLine.indexOf(":");
+  if (colonIndex === -1) {
+    return rawLine;
+  }
+
+  const keyPart = rawLine.slice(0, colonIndex + 1);
+  const afterColon = rawLine.slice(colonIndex + 1);
+  const spaceMatch = afterColon.match(/^(\s*)/);
+  const spaces = spaceMatch ? spaceMatch[1] : "";
+  const trimmedValue = afterColon.trim();
+
+  const valueStr = String(newValue);
+
+  // 检测原值引号风格并套用
+  let formattedValue: string;
+  if (trimmedValue.startsWith("'")) {
+    formattedValue = `'${valueStr.replace(/'/g, "\\'")}'`;
+  } else if (trimmedValue.startsWith('"')) {
+    formattedValue = `"${valueStr.replace(/"/g, '\\"')}"`;
+  } else {
+    formattedValue = valueStr;
+  }
+
+  return `${keyPart}${spaces}${formattedValue}`;
+}
+
+/**
+ * 编辑保存：以文本级字段替换方式更新 YAML 文件
+ *
+ * 1. 读取原始 YAML 文本
+ * 2. 用 parseYamlLines() 构建行索引
+ * 3. 对每处变更调用 replaceYamlFieldValue() 做文本替换
+ * 4. 将修改后的文本写回原文件
+ *
+ * 若所有字段值均未实际变更（update 中的值与原文一致），不触发写入。
+ *
+ * @param filePath - YAML 文件完整路径
+ * @param updates - 点分路径 → 新值的映射
+ * @returns 修改后的 YAML 文本
+ */
+export async function updateDeviceYaml(
+  filePath: string,
+  updates: Record<string, string | number | undefined>,
+): Promise<string> {
+  // 读取原始文本
+  const rawText = await readTextFile(filePath);
+  const lines = rawText.split("\n");
+  const index = parseYamlLines(rawText);
+
+  // 按行号排序（从后往前替换，避免行号偏移）
+  const changes: Array<{ lineIndex: number; newLine: string }> = [];
+
+  for (const [fieldPath, newValue] of Object.entries(updates)) {
+    // 找到匹配的行
+    const pathSegments = fieldPath.split(".");
+    const entry = index.find(
+      (e) =>
+        e.path.length === pathSegments.length &&
+        e.path.every((seg, i) => seg === pathSegments[i]),
+    );
+    if (!entry) {
+      console.warn(
+        `[devices] field "${fieldPath}" not found in YAML, skipping`,
+      );
+      continue;
+    }
+
+    const oldRaw = entry.valueRaw;
+    const newStr = newValue !== undefined ? String(newValue) : undefined;
+
+    // 跳过值未变的字段
+    if (newStr === oldRaw) {
+      continue;
+    }
+
+    const newLine = replaceYamlFieldValue(lines[entry.lineIndex], newValue);
+    changes.push({ lineIndex: entry.lineIndex, newLine });
+  }
+
+  // 从后往前替换，避免行号偏移
+  changes.sort((a, b) => b.lineIndex - a.lineIndex);
+
+  for (const { lineIndex, newLine } of changes) {
+    lines[lineIndex] = newLine;
+  }
+
+  const newText = lines.join("\n");
+
+  // 有实际变更才写入
+  if (changes.length > 0) {
+    await writeTextFile(filePath, newText);
+  }
+
+  return newText;
+}
+
+/**
+ * 删除设备：将 YAML 文件移入 OS 回收站
+ *
+ * @param filePath - YAML 文件完整路径
+ */
+export async function trashDeviceFile(filePath: string): Promise<void> {
+  await invoke("trash_file", { path: filePath });
 }

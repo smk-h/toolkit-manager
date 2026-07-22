@@ -67,6 +67,7 @@ export interface AdbChannel {
  */
 export interface Device {
   name: string;              // 设备名（文件名去扩展名）
+  filePath: string;          // YAML 文件完整路径，供写入与删除使用
   ssh?: SshChannel;          // SSH 通道，缺失表示未配置
   serial?: SerialChannel;    // Serial 通道，缺失表示未配置
   adb?: AdbChannel;          // ADB 通道，缺失表示未配置

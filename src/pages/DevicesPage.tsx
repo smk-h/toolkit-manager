@@ -13,7 +13,9 @@ import { useState } from "react";
 import { Settings } from "lucide-react";
 
 import { DeviceCard } from "@/components/DeviceCard";
+import { DeviceDeleteDialog } from "@/components/DeviceDeleteDialog";
 import { DeviceDetailDialog } from "@/components/DeviceDetailDialog";
+import { DeviceEditDialog } from "@/components/DeviceEditDialog";
 import { Button } from "@/components/ui/button";
 import { useDevices } from "@/hooks/useDevices";
 import { useToast } from "@/hooks/useToast";
@@ -41,10 +43,14 @@ export interface DevicesPageProps {
 export function DevicesPage({
   onNavigateSettings,
 }: DevicesPageProps): React.ReactElement {
-  const { status } = useDevices();
+  const { status, reload } = useDevices();
   const { show } = useToast();
   // 详情对话框当前查看的设备
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
+  // 编辑对话框当前编辑的设备
+  const [editDevice, setEditDevice] = useState<Device | null>(null);
+  // 删除对话框当前待删的设备
+  const [deleteDevice, setDeleteDevice] = useState<Device | null>(null);
 
   /**
    * 复制设备原始 yaml 全文到剪贴板
@@ -60,14 +66,26 @@ export function DevicesPage({
     }
   };
 
-  /** 编辑（占位） */
-  const handleEdit = (): void => {
-    show("编辑功能开发中", "info");
+  /** 编辑 */
+  const handleEdit = (device: Device): void => {
+    setEditDevice(device);
   };
 
-  /** 删除（占位） */
-  const handleDelete = (): void => {
-    show("删除功能开发中", "info");
+  /** 编辑保存成功 */
+  const handleEditSaved = (): void => {
+    reload();
+    setEditDevice(null);
+  };
+
+  /** 删除 */
+  const handleDelete = (device: Device): void => {
+    setDeleteDevice(device);
+  };
+
+  /** 删除确认成功 */
+  const handleDeleteDone = (): void => {
+    reload();
+    setDeleteDevice(null);
   };
 
   return (
@@ -140,6 +158,20 @@ export function DevicesPage({
       <DeviceDetailDialog
         device={detailDevice}
         onClose={() => setDetailDevice(null)}
+      />
+
+      {/* 编辑对话框 */}
+      <DeviceEditDialog
+        device={editDevice}
+        onClose={() => setEditDevice(null)}
+        onSaved={handleEditSaved}
+      />
+
+      {/* 删除确认对话框 */}
+      <DeviceDeleteDialog
+        device={deleteDevice}
+        onClose={() => setDeleteDevice(null)}
+        onDeleted={handleDeleteDone}
       />
     </div>
   );
