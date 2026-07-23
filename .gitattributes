@@ -1,0 +1,34 @@
+# =============================================================================
+# Git 属性配置文件
+# 官方文档: https://git-scm.com/docs/gitattributes
+# =============================================================================
+# 与 .editorconfig 的 end_of_line = lf 呼应，在 git checkout / commit 侧
+# 强制关键文本文件统一为 LF 换行，避免因平台差异（Windows 检出为 CRLF）导致
+# YAML 行级解析、模板字段替换等逻辑失效。
+# =============================================================================
+
+# 未显式声明的文本文件：git 自动判定类型，统一归一化为 LF
+* text=auto eol=lf
+
+# YAML（设备/项目模板、CI 配置等）：强制 LF，CRLF 会破坏行级字段解析
+*.yaml text eol=lf
+*.yml  text eol=lf
+
+# JSON（含 Tauri/Cargo 元数据、配置）：强制 LF
+*.json text eol=lf
+
+# 前端源码：强制 LF
+*.{ts,tsx,js,jsx,mjs,mts,cjs} text eol=lf
+
+# 二进制资源：标记为 binary，禁止 git 做任何换行符/编码转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.zip binary
+*.gz binary

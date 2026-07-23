@@ -208,16 +208,34 @@ export interface YamlLineEntry {
 }
 
 /**
+ * 将文本换行符归一化为 LF
+ *
+ * Windows 打包/解压的模板常为 CRLF，行级正则 `(.*)$` 会因行尾残留 \r
+ * 而失配（. 默认匹配 \r，导致 $ 锚点无位置可锚），进而令所有 scalar 字段
+ * 被解析阶段跳过、字段替换全部 NOT FOUND。归一化为 LF 后行级解析稳定。
+ *
+ * 写出的新文件统一为 LF，符合 .editorconfig 既定的 end_of_line = lf。
+ *
+ * @param text - 原始文本（可能含 \r\n 或裸 \r）
+ * @returns 仅以 \n 分行的文本
+ */
+function normalizeLineEndings(text: string): string {
+  // 先吃 \r\n（Windows），再兜底吃裸 \r（旧 Mac），两步顺序不可颠倒
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+/**
  * 解析 YAML 文本为行索引列表
  *
  * 逐行扫描，跟踪缩进级别来构建每个 scalar 字段的点分路径。
  * 仅含 scalar 行（key: value），跳过空行、纯注释行、container 行。
+ * 输入会先做换行符归一化（见 normalizeLineEndings），兼容 CRLF 模板。
  *
  * @param yamlText - 原始 YAML 文本
  * @returns 行索引列表
  */
 export function parseYamlLines(yamlText: string): YamlLineEntry[] {
-  const lines = yamlText.split("\n");
+  const lines = normalizeLineEndings(yamlText).split("\n");
   const entries: YamlLineEntry[] = [];
   // 缩进栈：记录当前路径及缩进级别
   const indentStack: Array<{ path: string[]; indent: number }> = [
@@ -339,8 +357,10 @@ function applyFieldUpdates(
   rawText: string,
   updates: Record<string, string | number | undefined>,
 ): string {
-  const lines = rawText.split("\n");
-  const index = parseYamlLines(rawText);
+  // 归一化后切分，确保与 parseYamlLines 内部使用同一份行号基准
+  const normalized = normalizeLineEndings(rawText);
+  const lines = normalized.split("\n");
+  const index = parseYamlLines(normalized);
 
   // 按行号收集变更（从后往前替换，避免行号偏移）
   const changes: Array<{ lineIndex: number; newLine: string }> = [];
