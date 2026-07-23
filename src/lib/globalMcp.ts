@@ -104,10 +104,18 @@ export async function detectGlobalMcp(): Promise<GlobalMcpStatus> {
  * command 复用 buildMcpCommand（正斜杠归一）。
  * 本函数不 try/catch 吞错，IO 异常向上抛由调用方处理。
  *
+ * toolkitPath 为空时直接抛错——否则 buildMcpCommand 会拼出
+ * `/remote-start-mcp.bat` 这样缺失前缀的残缺 command 写入配置文件，
+ * 与项目级 detectProjectStatus 的空路径语义对齐。
+ *
  * @param toolkitPath - embedded-mcp-toolkit 根路径
- * @throws 文件系统错误（权限拒绝、磁盘满等）
+ * @throws toolkitPath 为空（参数错误）或文件系统错误（权限拒绝、磁盘满等）
  */
 export async function enableGlobalMcp(toolkitPath: string): Promise<void> {
+  // 空路径守卫：避免写出 /remote-start-mcp.bat 残缺 command
+  if (!toolkitPath.trim()) {
+    throw new Error("toolkitPath 为空，无法生成 MCP command");
+  }
   const config = await readGlobalConfig();
   if (!config.mcpServers) {
     config.mcpServers = {};

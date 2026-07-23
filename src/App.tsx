@@ -129,12 +129,22 @@ function App(): React.ReactElement {
    *
    * 按待确认操作执行文件写入/移除，成功后刷新状态并上报开关视觉。
    * 失败时状态不变（开关回弹），仅 toast 报错。
+   *
+   * 启用前校验 toolkitPath：预置项路径未配置时直接拦截并提示，
+   * 避免向 ~/.claude.json 写入缺失前缀的残缺 command（/remote-start-mcp.bat）。
+   * 校验失败不进 try/catch（非「操作失败」语义），由 finally 统一关闭确认框。
    */
   const handleGlobalMcpConfirm = useCallback(async (): Promise<void> => {
     if (!globalMcpConfirmAction) {
       return;
     }
     const action = globalMcpConfirmAction;
+    // 空路径前置拦截：提示用户先去设备页配置 toolkit 路径
+    if (action === "enable" && !toolkitPath.trim()) {
+      show("请先在设备页配置 embedded-mcp-toolkit 路径", "error");
+      setGlobalMcpConfirmAction(null);
+      return;
+    }
     try {
       if (action === "enable") {
         await enableGlobalMcp(toolkitPath);
